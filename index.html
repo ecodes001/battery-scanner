@@ -8,60 +8,26 @@
   <style>
     body {
       font-family: sans-serif;
-      background-color: yellow !important; /* Force yellow background */
+      background-color: yellow !important;
       padding: 1rem;
       text-align: center;
       margin: 0;
     }
-    h1 {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #1a237e;
-      margin: 0.5rem 0 1rem;
-      text-shadow: 1px 1px #fff;
-    }
-    h2 { 
-      color:#1a237e; 
-      margin-top: 0;
-    }
+    h1 { font-size: 2rem; font-weight: bold; color: #1a237e; margin: 0.5rem 0 1rem; text-shadow: 1px 1px #fff; }
+    h2 { color:#1a237e; margin-top: 0; }
     .hidden { display:none; }
     .input { margin-top: 10px; }
-    input {
-      padding: 6px;
-      width: 220px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      background:#1a237e;
-      color:#fff;
-      border:none;
-      border-radius:4px;
-      cursor:pointer;
-    }
-    #reader {
-      width: 300px;
-      margin: 1rem auto;
-      border:2px solid #1a237e;
-      border-radius:8px;
-    }
-    #status {
-      margin-top: 1rem;
-      font-weight: bold;
-      color:#2e7d32; /* default green */
-    }
-    #status.error {
-      color: red; /* error messages in red */
-    }
+    input { padding: 6px; width: 220px; border: 1px solid #ccc; border-radius: 4px; }
+    button { margin-top: 10px; padding: 8px 16px; background:#1a237e; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+    #reader { width: 300px; margin: 1rem auto; border:2px solid #1a237e; border-radius:8px; }
+    #status { margin-top: 1rem; font-weight: bold; color:#2e7d32; }
+    #status.error { color: red; }
   </style>
 </head>
 <body>
   <h1>⚡ Ampersand Battery Check-in App ⚡</h1>
   <h2>Battery Scan</h2>
 
-  <!-- Step 1: Prompt for Date, Station & Attendant -->
   <div id="detailsForm">
     <div class="input">
       <label>Date:</label><br>
@@ -78,18 +44,27 @@
     <button onclick="startScan()">Start Scanning</button>
   </div>
 
-  <!-- Step 2: Scanner -->
   <div id="scanner" class="hidden">
     <div id="reader"></div>
     <p id="status">Scan a battery QR code…</p>
   </div>
 
   <script>
+    // --- config: replace with your current deployed Apps Script URL if different ---
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzMcr4Gupwas8c9w3SAfpC1lm6F9E4cYg9N8XhzIL9dZozo2LoUGNgcNxI0VffyzO6/exec';
+
     let scannedBatteries = new Set();
     let stationName = '';
     let attendantName = '';
     let scanDate = '';
     let html5QrcodeScanner;
+    let audioCtx = null; // unlocked on Start (user gesture)
+
+    // Auto-fill today's date so user doesn't have to pick it
+    window.addEventListener('load', () => {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').value = today;
+    });
 
     function startScan() {
       stationName = document.getElementById('station').value.trim();
@@ -99,6 +74,12 @@
       if (!stationName || !attendantName || !scanDate) {
         alert('Please fill date, station, and attendant name first.');
         return;
+      }
+
+      // create/resume AudioContext on user gesture so beep is allowed
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(()=>{ /* ignore resume errors */ });
       }
 
       document.getElementById('detailsForm').classList.add('hidden');
@@ -122,15 +103,21 @@
     }
 
     function playBeep() {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
-      oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.15);
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.14);
+      } catch (e) {
+        console.warn('Beep failed:', e);
+      }
     }
 
     function onScanSuccess(decodedText) {
@@ -146,7 +133,7 @@
       statusEl.classList.remove('error');
       statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
 
-      fetch('YOUR_DEPLOYED_SCRIPT_URL_HERE', {
+      fetch(SCRIPT_URL, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -156,19 +143,20 @@
           batteryNumber: decodedText
         })
       })
-      .then(res => res.json())
-      .then(json => {
-        if (json.status === "OK") {
-          playBeep(); // ✅ only beep after successful save
-          statusEl.classList.remove('error');
-          statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
-        } else {
-          throw new Error(json.error || "Unknown error");
-        }
+      .then(res => {
+        if (!res.ok) throw new Error('Server responded with status ' + res.status);
+        return res.text(); // handle HTML or plain text responses safely
+      })
+      .then(txt => {
+        // treat any successful HTTP response as success (Apps Script may return plain text or HTML)
+        playBeep(); // play only if server responded successfully
+        statusEl.classList.remove('error');
+        statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
+        // scanner remains active; attendant can continue scanning
       })
       .catch(err => {
         statusEl.classList.add('error');
-        statusEl.innerText = '⚠️ Error saving: ' + err.message;
+        statusEl.innerText = '⚠️ Error saving: ' + (err.message || err);
         scannedBatteries.delete(decodedText); // allow retry
       });
     }
