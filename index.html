@@ -61,8 +61,12 @@
   <h1>⚡ Ampersand Battery Check-in App ⚡</h1>
   <h2>Battery Scan</h2>
 
-  <!-- Step 1: Prompt for Station & Attendant -->
+  <!-- Step 1: Prompt for Date, Station & Attendant -->
   <div id="detailsForm">
+    <div class="input">
+      <label>Date:</label><br>
+      <input type="date" id="date">
+    </div>
     <div class="input">
       <label>Station:</label><br>
       <input type="text" id="station" placeholder="Station name">
@@ -84,13 +88,16 @@
     let scannedBatteries = new Set();
     let stationName = '';
     let attendantName = '';
+    let scanDate = '';
     let html5QrcodeScanner;
 
     function startScan() {
       stationName = document.getElementById('station').value.trim();
       attendantName = document.getElementById('attendant').value.trim();
-      if (!stationName || !attendantName) {
-        alert('Please fill station and attendant name first.');
+      scanDate = document.getElementById('date').value;
+
+      if (!stationName || !attendantName || !scanDate) {
+        alert('Please fill date, station, and attendant name first.');
         return;
       }
 
@@ -142,8 +149,9 @@
 
       fetch('https://script.google.com/macros/s/AKfycbzgq8AfFaHjql67BZNpKtwppThBA4HG1JqExYqG1HoHWVP_uAxlxaBCNgxrfZTkyxY8/exec', {
         method: 'POST',
-        headers: { "Content-Type": "application/json" }, // 👈 Fix here
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          date: scanDate,
           station: stationName,
           attendant: attendantName,
           batteryNumber: decodedText
