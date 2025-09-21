@@ -148,7 +148,7 @@
       statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
       statusEl.style.color = '#2e7d32'; 
 
-      fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
+      fetch('https://script.google.com/macros/s/AKfycbyGzwSVCdoPcWblh7-EfH5fCrj8Wuom6wKeYU7_FYthk_edpPNPgxl7ZOsJ2c5196vO/exec', {
         method: 'POST',
         body: JSON.stringify({
           date: scanDate,
