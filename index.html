@@ -1,135 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Battery Scan – Tawa Station</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <style>
-    body {
-      font-family: sans-serif;
-      background:#f9f9f9;
-      padding:1rem;
-      text-align:center;
-    }
-    h2 { color:#1a237e; }
-    .hidden { display:none; }
-    .input {
-      margin-top: 10px;
-    }
-    input {
-      padding: 6px;
-      width: 220px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      background:#1a237e;
-      color:#fff;
-      border:none;
-      border-radius:4px;
-      cursor:pointer;
-    }
-    #reader {
-      width: 300px;
-      margin: 1rem auto;
-      border:2px solid #1a237e;
-      border-radius:8px;
-    }
-    #status {
-      margin-top: 1rem;
-      font-weight: bold;
-      color:#43a047;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ampersand Battery Check-In System</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+  body { font-family: sans-serif; background:#f9f9f9; padding:1rem; text-align:center; }
+  h2 { color:#1a237e; }
+  .hidden { display:none; }
+  .input { margin-top: 10px; }
+  input { padding: 6px; width: 220px; border: 1px solid #ccc; border-radius: 4px; }
+  button { margin-top: 10px; padding: 8px 16px; background:#1a237e; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  #reader { width: 300px; margin: 1rem auto; border:2px solid #1a237e; border-radius:8px; }
+  #status { margin-top: 1rem; font-weight: bold; }
+  #scannedList { margin-top: 1rem; text-align:left; max-width: 400px; margin-left:auto; margin-right:auto; }
+  #scannedList li { padding: 4px 0; border-bottom: 1px solid #ccc; }
+</style>
 </head>
 <body>
-  <h2>Battery Scan</h2>
+<h2>Ampersand Battery Check-In System</h2>
 
-  <!-- Step 1: Prompt for Station & Attendant -->
-  <div id="detailsForm">
-    <div class="input">
-      <label>Station:</label><br>
-      <input type="text" id="station" placeholder="Station name">
-    </div>
-    <div class="input">
-      <label>Attendant's Name:</label><br>
-      <input type="text" id="attendant" placeholder="Attendant's Name">
-    </div>
-    <button onclick="startScan()">Start Scanning</button>
+<!-- Step 1: Prompt for Station & Attendant -->
+<div id="detailsForm">
+  <div class="input">
+    <label>Station:</label><br>
+    <input type="text" id="station" placeholder="Station name">
   </div>
-
-  <!-- Step 2: Scanner -->
-  <div id="scanner" class="hidden">
-    <div id="reader"></div>
-    <p id="status">Scan a battery QR code…</p>
+  <div class="input">
+    <label>Attendant's Name:</label><br>
+    <input type="text" id="attendant" placeholder="Attendant's Name">
   </div>
+  <button onclick="startScan()">Start Scanning</button>
+</div>
 
-  <script>
-    let scannedBatteries = new Set(); // store scanned codes locally
-    let stationName = '';
-    let attendantName = '';
-    let html5QrcodeScanner;
+<!-- Step 2: Scanner -->
+<div id="scanner" class="hidden">
+  <div id="reader"></div>
+  <p id="status">Scan a battery QR code…</p>
+  <ul id="scannedList"></ul>
+  <button id="continueBtn" class="hidden" onclick="resumeScan()">Continue Scanning</button>
+</div>
 
-    function startScan() {
-      stationName = document.getElementById('station').value.trim();
-      attendantName = document.getElementById('attendant').value.trim();
-      if (!stationName || !attendantName) {
-        alert('Please fill station and attendant name first.');
-        return;
-      }
+<!-- Beep sound -->
+<audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
-      // hide form, show scanner
-      document.getElementById('detailsForm').classList.add('hidden');
-      document.getElementById('scanner').classList.remove('hidden');
+<script>
+let scannedBatteries = new Set(); // local store to prevent double scan
+let stationName = '';
+let attendantName = '';
+let html5QrcodeScanner;
+let lastDecoded = '';
 
-      // start QR scanner with back camera
-      html5QrcodeScanner = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          // find a device with 'back' in the label, fallback to first
-          let backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-          html5QrcodeScanner.start(
-            backCam.id,
-            { fps: 10, qrbox: 250 },
-            onScanSuccess
-          );
-        } else {
-          document.getElementById('status').innerText = 'No camera found';
-        }
-      }).catch(err => {
-        document.getElementById('status').innerText = 'Camera error: ' + err;
-      });
+function startScan() {
+  stationName = document.getElementById('station').value.trim();
+  attendantName = document.getElementById('attendant').value.trim();
+  if (!stationName || !attendantName) {
+    alert('Please fill station and attendant name first.');
+    return;
+  }
+
+  document.getElementById('detailsForm').classList.add('hidden');
+  document.getElementById('scanner').classList.remove('hidden');
+
+  html5QrcodeScanner = new Html5Qrcode("reader");
+  Html5Qrcode.getCameras().then(devices => {
+    if (devices && devices.length) {
+      let backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+      html5QrcodeScanner.start(
+        backCam.id,
+        { fps: 10, qrbox: 250 },
+        onScanSuccess
+      );
+    } else {
+      document.getElementById('status').innerText = 'No camera found';
     }
+  }).catch(err => {
+    document.getElementById('status').innerText = 'Camera error: ' + err;
+  });
+}
 
-    function onScanSuccess(decodedText) {
-      if (scannedBatteries.has(decodedText)) {
-        document.getElementById('status').innerText = 'Duplicate battery ignored: ' + decodedText;
-        return; // ignore duplicates on client side
-      }
+// Called whenever a QR code is successfully scanned
+function onScanSuccess(decodedText) {
+  // Play beep sound
+  document.getElementById('beep').play();
+
+  if (scannedBatteries.has(decodedText)) {
+    displayScanStatus(decodedText, 'Duplicate (ignored)', 'orange');
+    return;
+  }
+
+  // Stop scanning temporarily to handle save
+  html5QrcodeScanner.stop().then(() => {
+    lastDecoded = decodedText;
+    document.getElementById('status').innerText = 'Saving: ' + decodedText;
+    saveScan(decodedText);
+  });
+}
+
+// Save the scan to Google Sheets
+function saveScan(decodedText) {
+  fetch('https://script.google.com/macros/s/AKfycbzRNKel8gyDh_aXTYtGZSXmzQABT3hFCxvxQXyBoMNtfd_tk4cJzudFUhczisJyH3OR/exec', {
+    method: 'POST',
+    body: JSON.stringify({
+      station: stationName,
+      attendant: attendantName,
+      batteryNumber: decodedText
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.status === 'success') {
       scannedBatteries.add(decodedText);
-      document.getElementById('status').innerText = 'Scanned: ' + decodedText + ' (saving…)';
-
-      fetch('https://script.google.com/macros/s/AKfycbyzxux8BDjJj1XOOohRuk5n9b7_VgX6m4yFeBjLVa75zeWbFxelYufnQ7nRe0Wn2Rw/exec', {
-        method: 'POST',
-        body: JSON.stringify({
-          station: stationName,
-          attendant: attendantName,
-          batteryNumber: decodedText
-        })
-      })
-      .then(res => res.text())
-      .then(txt => {
-        document.getElementById('status').innerText = 'Saved: ' + decodedText;
-      })
-      .catch(err => {
-        document.getElementById('status').innerText = 'Error saving: ' + err;
-        // allow re-scan if save failed
-        scannedBatteries.delete(decodedText);
-      });
+      displayScanStatus(decodedText, 'Saved', 'green');
+    } else if(data.status === 'duplicate') {
+      displayScanStatus(decodedText, 'Duplicate (server)', 'orange');
+    } else {
+      displayScanStatus(decodedText, 'Error: ' + data.message, 'red');
     }
-  </script>
+    // Show continue button
+    document.getElementById('continueBtn').classList.remove('hidden');
+  })
+  .catch(err => {
+    displayScanStatus(decodedText, 'Error: ' + err, 'red');
+    document.getElementById('continueBtn').classList.remove('hidden');
+  });
+}
+
+// Display scan result in list
+function displayScanStatus(code, message, color) {
+  const li = document.createElement('li');
+  li.textContent = code + ' → ' + message;
+  li.style.color = color;
+  document.getElementById('scannedList').appendChild(li);
+  document.getElementById('status').innerText = message;
+}
+
+// Continue scanning
+function resumeScan() {
+  document.getElementById('continueBtn').classList.add('hidden');
+  document.getElementById('status').innerText = 'Scan a battery QR code…';
+  html5QrcodeScanner.start(
+    html5QrcodeScanner.getRunningCameraId(),
+    { fps: 10, qrbox: 250 },
+    onScanSuccess
+  );
+}
+</script>
 </body>
 </html>
