@@ -142,6 +142,7 @@
 
       fetch('https://script.google.com/macros/s/AKfycbyGzwSVCdoPcWblh7-EfH5fCrj8Wuom6wKeYU7_FYthk_edpPNPgxl7ZOsJ2c5196vO/exec', {
         method: 'POST',
+        headers: { "Content-Type": "application/json" }, // 👈 Fix here
         body: JSON.stringify({
           station: stationName,
           attendant: attendantName,
