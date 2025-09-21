@@ -143,11 +143,10 @@
       }
       scannedBatteries.add(decodedText);
 
-      playBeep(); // ✅ play beep sound
       statusEl.classList.remove('error');
       statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
 
-      fetch('https://script.google.com/macros/s/AKfycbzzMcr4Gupwas8c9w3SAfpC1lm6F9E4cYg9N8XhzIL9dZozo2LoUGNgcNxI0VffyzO6/exec', {
+      fetch('YOUR_DEPLOYED_SCRIPT_URL_HERE', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -157,15 +156,20 @@
           batteryNumber: decodedText
         })
       })
-      .then(res => res.text())
-      .then(txt => {
-        statusEl.classList.remove('error');
-        statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
+      .then(res => res.json())
+      .then(json => {
+        if (json.status === "OK") {
+          playBeep(); // ✅ only beep after successful save
+          statusEl.classList.remove('error');
+          statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
+        } else {
+          throw new Error(json.error || "Unknown error");
+        }
       })
       .catch(err => {
         statusEl.classList.add('error');
-        statusEl.innerText = '⚠️ Error saving: ' + err;
-        scannedBatteries.delete(decodedText);
+        statusEl.innerText = '⚠️ Error saving: ' + err.message;
+        scannedBatteries.delete(decodedText); // allow retry
       });
     }
   </script>
