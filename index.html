@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ampersand Battery Check-In System(ABS)</title>
+<title>Ampersand Battery Check-In System</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
   body { 
@@ -83,18 +83,17 @@
   <div id="reader"></div>
   <p id="status">Scan a battery QR code…</p>
   <ul id="scannedList"></ul>
-  <button id="continueBtn" class="hidden" onclick="resumeScan()">Continue Scanning</button>
 </div>
 
 <!-- Beep sound -->
 <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
 <script>
-let scannedBatteries = new Set(); // local store to prevent double scan
+let scannedBatteries = new Set(); // prevent duplicates locally
 let stationName = '';
 let attendantName = '';
 let html5QrcodeScanner;
-let lastDecoded = '';
+let currentCameraId = '';
 
 function startScan() {
   stationName = document.getElementById('station').value.trim();
@@ -108,13 +107,16 @@ function startScan() {
   document.getElementById('scanner').classList.remove('hidden');
 
   html5QrcodeScanner = new Html5Qrcode("reader");
+
   Html5Qrcode.getCameras().then(devices => {
     if (devices && devices.length) {
       let backCam = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+      currentCameraId = backCam.id;
       html5QrcodeScanner.start(
-        backCam.id,
+        currentCameraId,
         { fps: 10, qrbox: 250 },
-        onScanSuccess
+        onScanSuccess,
+        onScanError
       );
     } else {
       document.getElementById('status').innerText = 'No camera found';
@@ -126,25 +128,18 @@ function startScan() {
 
 // Called whenever a QR code is successfully scanned
 function onScanSuccess(decodedText) {
-  // Play beep sound
-  document.getElementById('beep').play();
+  document.getElementById('beep').play(); // beep sound
 
   if (scannedBatteries.has(decodedText)) {
-    displayScanStatus(decodedText, 'Duplicate (ignored)', 'orange');
+    displayScanStatus(decodedText, 'Duplicate (ignored)', 'red'); // red for duplicate
     return;
   }
 
-  // Stop scanning temporarily to handle save
-  html5QrcodeScanner.stop().then(() => {
-    lastDecoded = decodedText;
-    document.getElementById('status').innerText = 'Saving: ' + decodedText;
-    saveScan(decodedText);
-  });
-}
+  // Temporarily pause scanner while saving
+  html5QrcodeScanner.pause(true);
+  document.getElementById('status').innerText = 'Saving: ' + decodedText;
 
-// Save the scan to Google Sheets
-function saveScan(decodedText) {
-  fetch('https://script.google.com/macros/s/AKfycbyzxux8BDjJj1XOOohRuk5n9b7_VgX6m4yFeBjLVa75zeWbFxelYufnQ7nRe0Wn2Rw/exec', {
+  fetch('https://script.google.com/macros/s/AKfycbzRNKel8gyDh_aXTYtGZSXmzQABT3hFCxvxQXyBoMNtfd_tk4cJzudFUhczisJyH3OR/exec', {
     method: 'POST',
     body: JSON.stringify({
       station: stationName,
@@ -158,36 +153,29 @@ function saveScan(decodedText) {
       scannedBatteries.add(decodedText);
       displayScanStatus(decodedText, 'Saved', 'green');
     } else if(data.status === 'duplicate') {
-      displayScanStatus(decodedText, 'Duplicate (server)', 'orange');
+      displayScanStatus(decodedText, 'Duplicate (server)', 'red'); // red for duplicate
     } else {
       displayScanStatus(decodedText, 'Error: ' + data.message, 'red');
     }
-    document.getElementById('continueBtn').classList.remove('hidden');
+    html5QrcodeScanner.resume(); // continue scanning automatically
   })
   .catch(err => {
     displayScanStatus(decodedText, 'Error: ' + err, 'red');
-    document.getElementById('continueBtn').classList.remove('hidden');
+    html5QrcodeScanner.resume(); // continue scanning even if error
   });
 }
 
-// Display scan result in list
+function onScanError(errorMessage) {
+  // Ignore scan errors (optional logging)
+  // console.log('Scan error', errorMessage);
+}
+
 function displayScanStatus(code, message, color) {
   const li = document.createElement('li');
   li.textContent = code + ' → ' + message;
   li.style.color = color;
   document.getElementById('scannedList').appendChild(li);
   document.getElementById('status').innerText = message;
-}
-
-// Continue scanning
-function resumeScan() {
-  document.getElementById('continueBtn').classList.add('hidden');
-  document.getElementById('status').innerText = 'Scan a battery QR code…';
-  html5QrcodeScanner.start(
-    html5QrcodeScanner.getRunningCameraId(),
-    { fps: 10, qrbox: 250 },
-    onScanSuccess
-  );
 }
 </script>
 </body>
