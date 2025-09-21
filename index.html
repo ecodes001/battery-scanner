@@ -8,7 +8,7 @@
   <style>
     body {
       font-family: sans-serif;
-      background-color: yellow !important; /* Force yellow background */
+      background-color: yellow !important;
       padding: 1rem;
       text-align: center;
       margin: 0;
@@ -58,8 +58,12 @@
   <h1>⚡ Ampersand Battery Check-in App ⚡</h1>
   <h2>Battery Scan</h2>
 
-  <!-- Step 1: Prompt for Station & Attendant -->
+  <!-- Step 1: Prompt for Date, Station & Attendant -->
   <div id="detailsForm">
+    <div class="input">
+      <label>Date:</label><br>
+      <input type="date" id="date">
+    </div>
     <div class="input">
       <label>Station:</label><br>
       <input type="text" id="station" placeholder="Station name">
@@ -81,15 +85,21 @@
     let scannedBatteries = new Set();
     let stationName = '';
     let attendantName = '';
+    let scanDate = '';
     let html5QrcodeScanner;
+    let audioCtx;
 
     function startScan() {
+      scanDate = document.getElementById('date').value;
       stationName = document.getElementById('station').value.trim();
       attendantName = document.getElementById('attendant').value.trim();
-      if (!stationName || !attendantName) {
-        alert('Please fill station and attendant name first.');
+      if (!scanDate || !stationName || !attendantName) {
+        alert('Please fill date, station, and attendant name first.');
         return;
       }
+
+      // unlock audio context
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
       document.getElementById('detailsForm').classList.add('hidden');
       document.getElementById('scanner').classList.remove('hidden');
@@ -112,31 +122,36 @@
     }
 
     function playBeep() {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
+      if (!audioCtx) return;
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
       oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
+      gainNode.connect(audioCtx.destination);
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime); // frequency Hz
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
       oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.15); // short beep 150ms
+      oscillator.stop(audioCtx.currentTime + 0.15);
     }
 
     function onScanSuccess(decodedText) {
+      const statusEl = document.getElementById('status');
+
       if (scannedBatteries.has(decodedText)) {
-        document.getElementById('status').innerText = 'Duplicate battery ignored: ' + decodedText;
+        statusEl.innerText = 'Duplicate battery ignored: ' + decodedText;
+        statusEl.style.color = 'red'; 
         return;
       }
       scannedBatteries.add(decodedText);
 
-      playBeep(); // ✅ play beep sound
+      playBeep();
 
-      document.getElementById('status').innerText = 'Scanned: ' + decodedText + ' (saving…)';
+      statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
+      statusEl.style.color = '#2e7d32'; 
 
-      fetch('https://script.google.com/macros/s/AKfycbyGzwSVCdoPcWblh7-EfH5fCrj8Wuom6wKeYU7_FYthk_edpPNPgxl7ZOsJ2c5196vO/exec', {
+      fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
         method: 'POST',
         body: JSON.stringify({
+          date: scanDate,
           station: stationName,
           attendant: attendantName,
           batteryNumber: decodedText
@@ -144,10 +159,12 @@
       })
       .then(res => res.text())
       .then(txt => {
-        document.getElementById('status').innerText = 'Saved: ' + decodedText + ' ✅ Ready for next scan…';
+        statusEl.innerText = 'Saved: ' + decodedText + ' ✅ Ready for next scan…';
+        statusEl.style.color = '#2e7d32';
       })
       .catch(err => {
-        document.getElementById('status').innerText = 'Error saving: ' + err;
+        statusEl.innerText = 'Error saving: ' + err;
+        statusEl.style.color = 'red';
         scannedBatteries.delete(decodedText);
       });
     }
