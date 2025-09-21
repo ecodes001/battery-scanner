@@ -140,7 +140,7 @@
       statusEl.classList.remove('error');
       statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
 
-      fetch('https://script.google.com/macros/s/AKfycbyGzwSVCdoPcWblh7-EfH5fCrj8Wuom6wKeYU7_FYthk_edpPNPgxl7ZOsJ2c5196vO/exec', {
+      fetch('https://script.google.com/macros/s/AKfycbzgq8AfFaHjql67BZNpKtwppThBA4HG1JqExYqG1HoHWVP_uAxlxaBCNgxrfZTkyxY8/exec', {
         method: 'POST',
         headers: { "Content-Type": "application/json" }, // 👈 Fix here
         body: JSON.stringify({
