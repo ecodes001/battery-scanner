@@ -8,7 +8,7 @@
   <style>
     body {
       font-family: sans-serif;
-      background-color: yellow !important;
+      background-color: yellow !important; /* Force yellow background */
       padding: 1rem;
       text-align: center;
       margin: 0;
@@ -50,7 +50,10 @@
     #status {
       margin-top: 1rem;
       font-weight: bold;
-      color:#2e7d32;
+      color:#2e7d32; /* default green */
+    }
+    #status.error {
+      color: red; /* error messages in red */
     }
   </style>
 </head>
@@ -58,12 +61,8 @@
   <h1>⚡ Ampersand Battery Check-in App ⚡</h1>
   <h2>Battery Scan</h2>
 
-  <!-- Step 1: Prompt for Date, Station & Attendant -->
+  <!-- Step 1: Prompt for Station & Attendant -->
   <div id="detailsForm">
-    <div class="input">
-      <label>Date:</label><br>
-      <input type="date" id="date">
-    </div>
     <div class="input">
       <label>Station:</label><br>
       <input type="text" id="station" placeholder="Station name">
@@ -85,21 +84,15 @@
     let scannedBatteries = new Set();
     let stationName = '';
     let attendantName = '';
-    let scanDate = '';
     let html5QrcodeScanner;
-    let audioCtx;
 
     function startScan() {
-      scanDate = document.getElementById('date').value;
       stationName = document.getElementById('station').value.trim();
       attendantName = document.getElementById('attendant').value.trim();
-      if (!scanDate || !stationName || !attendantName) {
-        alert('Please fill date, station, and attendant name first.');
+      if (!stationName || !attendantName) {
+        alert('Please fill station and attendant name first.');
         return;
       }
-
-      // unlock audio context
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
       document.getElementById('detailsForm').classList.add('hidden');
       document.getElementById('scanner').classList.remove('hidden');
@@ -122,36 +115,34 @@
     }
 
     function playBeep() {
-      if (!audioCtx) return;
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
       oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      gainNode.connect(ctx.destination);
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
       oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.15);
+      oscillator.stop(ctx.currentTime + 0.15);
     }
 
     function onScanSuccess(decodedText) {
       const statusEl = document.getElementById('status');
 
       if (scannedBatteries.has(decodedText)) {
-        statusEl.innerText = 'Duplicate battery ignored: ' + decodedText;
-        statusEl.style.color = 'red'; 
+        statusEl.classList.add('error');
+        statusEl.innerText = '❌ Duplicate battery ignored: ' + decodedText;
         return;
       }
       scannedBatteries.add(decodedText);
 
-      playBeep();
-
+      playBeep(); // ✅ play beep sound
+      statusEl.classList.remove('error');
       statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
-      statusEl.style.color = '#2e7d32'; 
 
       fetch('https://script.google.com/macros/s/AKfycbyGzwSVCdoPcWblh7-EfH5fCrj8Wuom6wKeYU7_FYthk_edpPNPgxl7ZOsJ2c5196vO/exec', {
         method: 'POST',
         body: JSON.stringify({
-          date: scanDate,
           station: stationName,
           attendant: attendantName,
           batteryNumber: decodedText
@@ -159,12 +150,12 @@
       })
       .then(res => res.text())
       .then(txt => {
-        statusEl.innerText = 'Saved: ' + decodedText + ' ✅ Ready for next scan…';
-        statusEl.style.color = '#2e7d32';
+        statusEl.classList.remove('error');
+        statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
       })
       .catch(err => {
-        statusEl.innerText = 'Error saving: ' + err;
-        statusEl.style.color = 'red';
+        statusEl.classList.add('error');
+        statusEl.innerText = '⚠️ Error saving: ' + err;
         scannedBatteries.delete(decodedText);
       });
     }
