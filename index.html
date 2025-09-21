@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ampersand Battery Check-In System</title>
+<title>Ampersand Battery Check-In System(ABCS)</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
   body { 
@@ -139,7 +139,7 @@ function onScanSuccess(decodedText) {
   html5QrcodeScanner.pause(true);
   document.getElementById('status').innerText = 'Saving: ' + decodedText;
 
-  fetch('https://script.google.com/macros/s/AKfycbzRNKel8gyDh_aXTYtGZSXmzQABT3hFCxvxQXyBoMNtfd_tk4cJzudFUhczisJyH3OR/exec', {
+  fetch('https://script.google.com/macros/s/AKfycbyzxux8BDjJj1XOOohRuk5n9b7_VgX6m4yFeBjLVa75zeWbFxelYufnQ7nRe0Wn2Rw/exec', {
     method: 'POST',
     body: JSON.stringify({
       station: stationName,
