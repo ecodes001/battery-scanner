@@ -8,15 +8,22 @@
   <style>
     body {
       font-family: sans-serif;
-      background: #fff176; /* yellow background */
+      background-color: yellow !important; /* Force yellow background */
       padding: 1rem;
       text-align: center;
+      margin: 0;
     }
     h1 {
+      font-size: 2rem;
+      font-weight: bold;
       color: #1a237e;
-      margin-bottom: 0.5rem;
+      margin: 0.5rem 0 1rem;
+      text-shadow: 1px 1px #fff;
     }
-    h2 { color: #1a237e; }
+    h2 { 
+      color:#1a237e; 
+      margin-top: 0;
+    }
     .hidden { display:none; }
     .input { margin-top: 10px; }
     input {
@@ -70,8 +77,6 @@
     <p id="status">Scan a battery QR code…</p>
   </div>
 
-  <audio id="beepSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
-
   <script>
     let scannedBatteries = new Set();
     let stationName = '';
@@ -86,11 +91,9 @@
         return;
       }
 
-      // hide form, show scanner
       document.getElementById('detailsForm').classList.add('hidden');
       document.getElementById('scanner').classList.remove('hidden');
 
-      // start QR scanner
       html5QrcodeScanner = new Html5Qrcode("reader");
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
@@ -108,6 +111,18 @@
       });
     }
 
+    function playBeep() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, ctx.currentTime); // frequency Hz
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.15); // short beep 150ms
+    }
+
     function onScanSuccess(decodedText) {
       if (scannedBatteries.has(decodedText)) {
         document.getElementById('status').innerText = 'Duplicate battery ignored: ' + decodedText;
@@ -115,8 +130,7 @@
       }
       scannedBatteries.add(decodedText);
 
-      // play beep
-      document.getElementById('beepSound').play();
+      playBeep(); // ✅ play beep sound
 
       document.getElementById('status').innerText = 'Scanned: ' + decodedText + ' (saving…)';
 
@@ -134,7 +148,7 @@
       })
       .catch(err => {
         document.getElementById('status').innerText = 'Error saving: ' + err;
-        scannedBatteries.delete(decodedText); // allow re-scan
+        scannedBatteries.delete(decodedText);
       });
     }
   </script>
