@@ -50,7 +50,10 @@
     #status {
       margin-top: 1rem;
       font-weight: bold;
-      color:#2e7d32;
+      color:#2e7d32; /* default green */
+    }
+    #status.error {
+      color: red; /* error messages in red */
     }
   </style>
 </head>
@@ -118,21 +121,24 @@
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime); // frequency Hz
+      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
       oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.15); // short beep 150ms
+      oscillator.stop(ctx.currentTime + 0.15);
     }
 
     function onScanSuccess(decodedText) {
+      const statusEl = document.getElementById('status');
+
       if (scannedBatteries.has(decodedText)) {
-        document.getElementById('status').innerText = 'Duplicate battery ignored: ' + decodedText;
+        statusEl.classList.add('error');
+        statusEl.innerText = '❌ Duplicate battery ignored: ' + decodedText;
         return;
       }
       scannedBatteries.add(decodedText);
 
       playBeep(); // ✅ play beep sound
-
-      document.getElementById('status').innerText = 'Scanned: ' + decodedText + ' (saving…)';
+      statusEl.classList.remove('error');
+      statusEl.innerText = 'Scanned: ' + decodedText + ' (saving…)';
 
       fetch('https://script.google.com/macros/s/AKfycbyWfOUHAzppL4s8dBEnZoUuD5qFfofyoOpnJqoqMfibtx6qT0CXhXIkyOBMhs_wli-_/exec', {
         method: 'POST',
@@ -144,10 +150,12 @@
       })
       .then(res => res.text())
       .then(txt => {
-        document.getElementById('status').innerText = 'Saved: ' + decodedText + ' ✅ Ready for next scan…';
+        statusEl.classList.remove('error');
+        statusEl.innerText = '✅ Saved: ' + decodedText + ' – Ready for next scan…';
       })
       .catch(err => {
-        document.getElementById('status').innerText = 'Error saving: ' + err;
+        statusEl.classList.add('error');
+        statusEl.innerText = '⚠️ Error saving: ' + err;
         scannedBatteries.delete(decodedText);
       });
     }
